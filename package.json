@@ -1,0 +1,20 @@
+{
+  "name": "chaoxing-study-helper",
+  "version": "0.6.7",
+  "description": "学习通课程学习辅助 userscript：连续播放、章节测验与可配置 AI。",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "build:check": "node scripts/build.cjs --check",
+    "test": "node scripts/build.cjs --check && node scripts/test.cjs",
+    "check:package": "node scripts/check-package.cjs",
+    "check": "npm run build && npm test && npm run check:package"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.12"
+  }
+}

@@ -1,0 +1,238 @@
+{
+  "version": "0.6.7",
+  "allPassed": true,
+  "scenarioCount": 151,
+  "artifact": {
+    "bytes": 138746,
+    "sha256": "b26676b41bb56f8611fd629fd543f6b5a45f43ab488fedb2948544c924356a76"
+  },
+  "suites": [
+    {
+      "name": "syntax",
+      "passed": true,
+      "checks": []
+    },
+    {
+      "name": "font",
+      "passed": true,
+      "checks": [
+        "actual chapter cmap contains 29 replaced characters and excludes ordinary Chinese, punctuation, Latin text and option markers",
+        "truncated fonts and cmap offsets outside the supplied font fail safely",
+        "format 12 supplementary Unicode coverage is decoded without treating surrogate halves as characters",
+        "observed encrypted ExampleTool structure restores mapped glyphs, sends readable questions to AI, fills and submits single/judgement answers",
+        "one genuinely uncertain glyph blocks only its question; other questions reach AI, but an incomplete test is never submitted",
+        "unresolved glyph failure names its real cause and never renders or sends an image before vision opt-in",
+        "explicit vision opt-in draws the undecoded glyph in the original font, sends only the question image, then fills and confirms the complete quiz",
+        "a provider rejecting image input cannot cause a partial fill or submission and temporary fonts are released",
+        "saving the vision opt-in after a font pause automatically retries the question and completes without another scan or Start click",
+        "normal text styled with font-cxsecret needs no glyph table when outside the actual cmap",
+        "navigation during font loading cannot apply stale mapping, call AI or submit another page",
+        "opening the observed encrypted chapter route automatically detects, restores, calls AI, fills and submits without any manual scan or run call",
+        "actual verified glyph bytes restore 面 with either loca format and independently of the randomized character code",
+        "a different outline or missing glyph tables cannot match the verified fingerprint",
+        "the real low-confidence 面 glyph is restored by its verified fingerprint and the complete automatic quiz/AI/submission chain resumes"
+      ]
+    },
+    {
+      "name": "fontImage",
+      "passed": true,
+      "checks": [
+        "question image draws original coded glyphs with their embedded font, labels every option, excludes page/account/input data and releases its font",
+        "long question text wraps within the canvas instead of clipping the right edge",
+        "excessive text is rejected without silently truncating a question or leaking a temporary font",
+        "navigation or Stop while loading the embedded font prevents rendering a stale question",
+        "missing fonts, unavailable canvas and oversized image data stop safely and release resources"
+      ]
+    },
+    {
+      "name": "background",
+      "passed": true,
+      "checks": [
+        "switching to a hidden tab captures visibility pause and resumes actual media without falsifying document visibility",
+        "player iframe blur and pause events share one coalesced resume request",
+        "ordinary input focus changes do not trigger the window-leaving guard",
+        "turning background playback off prevents both interception and automatic background resume",
+        "inline questions and platform verification block auto-resume until their blocking state is cleared",
+        "stop removes listeners and invalidates an already queued resume microtask",
+        "stale and ended media cannot be restarted by background handlers",
+        "frozen lifecycle is respected; browser resume rebases the watchdog and resumes current media",
+        "repeated platform pause events are coalesced and rate-limited instead of creating a busy loop",
+        "stop cancels a delayed background retry without a later accidental restart"
+      ]
+    },
+    {
+      "name": "media",
+      "passed": true,
+      "checks": [
+        "actual-page structure: recognize, resume, sign, final report, controls",
+        "stale chapter cannot start",
+        "HTTP errors retain status and release controls",
+        "login/verification HTML is diagnosed",
+        "stop aborts pending request without scheduling another report",
+        "invalid metadata cannot create a report",
+        "read-only probe sends metadata only and redacts token",
+        "actual player starts, requires observed progress, ends, restores mute and releases controls",
+        "stop cancels actual playback and removes listeners and watchdog",
+        "synchronous play errors and autoplay rejection leave no running watchdog",
+        "actual playback stops on chapter change",
+        "lazy platform player initializes through its play button; leaving-page handler is scoped and removed on stop",
+        "a lazy platform button resetting mute is followed by one muted native play; original mute settings are restored on stop",
+        "persistent NotAllowedError waits without polling play or timing out, ignores synthetic clicks, then resumes the same task on a real player click",
+        "stopping during the muted retry cancels its timer and removes gesture listeners",
+        "blank native player entry reloads its existing platform URL once before actual playback",
+        "stopping during blank player loading prevents a later start",
+        "native player waits for one inline handler and resumes playback after confirmed feedback",
+        "late inline completion cannot restart a stopped native player",
+        "a large hidden-tab timer gap extends watchdog budgets without changing actual playback time",
+        "returning from a suspended hidden tab rebases watchdogs before the visible-tab check"
+      ]
+    },
+    {
+      "name": "quiz",
+      "passed": true,
+      "checks": [
+        "real-form selectors recognize both encrypted questions without duplication or network",
+        "scoped local answers match by question ID and option text",
+        "fill removes unwanted multi choice and selects exact answers without submitting",
+        "save invokes platform action",
+        "submit follows the platform confirmation chain",
+        "nested quiz clicks the actual top-window confirmation button and closes its modal without calling submitCheckTimes",
+        "a persisted initial submission resumes its visible pending confirmation without rematching answers or submitting twice",
+        "missing confirmation pauses with a durable pending record and never falls back to a hidden submit function",
+        "a final confirmation that stays open is clicked only once, including on repeated automation runs",
+        "an unrelated top-window confirmation is never accepted",
+        "incomplete answers cause no partial fill or submission",
+        "stale quiz cannot be saved or submitted",
+        "local question IDs do not leak across courses; remote bank stays off",
+        "opt-in free-bank contract supports multi-answer arrays without account or URL fields",
+        "one-click completion matches, fills, and submits fully resolved local questions",
+        "observed video inline judgement matches scoped answer, selects, submits and continues after feedback",
+        "video inline missing answer pauses without selection or submission",
+        "incorrect video inline feedback prevents continuation",
+        "already-confirmed video inline feedback continues without reanswering",
+        "stale video inline request cannot select or submit after its player is stopped",
+        "busy remote bank makes at most two spaced retries without submission",
+        "unknown inline question uses configured AI and completes the actual answer/feedback chain without exposing the key",
+        "third-party bank HTTP 429 falls back to AI instead of stopping before AI",
+        "chapter multiple/single questions use AI, validate all answers, fill and submit",
+        "low-confidence AI answer cannot select or submit an inline question",
+        "scoped local answers take priority without calling AI",
+        "private settings UI saves without key echo, tests only a synthetic question and clears the key on request",
+        "stopping an AI-backed inline question aborts its request before any platform selection or submission",
+        "persisted submission journal prevents duplicate automatic submission; explicit reset permits a retry",
+        "newTiMu/fontLabel/newZy_TItle layout and qtype fallback retain both question types",
+        "image-only question is detected and never silently sent as empty text or auto-submitted without vision consent",
+        "Doubao preset populates the endpoint without configuring or sending a secret",
+        "rate-limited bank enters cooldown and subsequent questions go directly to configured AI",
+        "late font and image resources change the detection fingerprint while answer selection alone cannot trigger another automatic submission"
+      ]
+    },
+    {
+      "name": "quizAuto",
+      "passed": true,
+      "checks": [
+        "chapter quiz opens and runs automatically once, without scan/match/fill clicks or repeated calls from duplicate events",
+        "course coordinator retains ownership; changed answer configuration resumes the paused course instead of starting a competing quiz runner",
+        "missing-answer failure waits for a changed API/bank configuration and never spins on the same task",
+        "a changed question set is automatically detected as a new task",
+        "explicit stop cancels the in-flight quiz, persists the preference, and rejects late completion",
+        "general homework, previously submitted tests, disabled automation and stopped course flows never auto-submit",
+        "a second same-course tab waits when the course Web Lock is unavailable",
+        "asynchronously loaded questions are detected and started after the original empty page",
+        "leaving the page clears polling and pending automatic detection before it can submit"
+      ]
+    },
+    {
+      "name": "ai",
+      "passed": true,
+      "checks": [
+        "AI is disabled and makes no request before explicit configuration",
+        "configured endpoint and Bearer auth send only question data; cache validates against the fresh question and releases timers",
+        "optional JSON mode is included only when enabled",
+        "a saved key cannot silently follow an endpoint change to another domain",
+        "invalid remote endpoints are rejected; explicitly configured local no-key service is supported",
+        "low confidence, unknown/extra options, truncation, malformed JSON, invalid confidence and tool calls never produce an answer",
+        "fenced JSON and text-part content are parsed without evaluating returned code",
+        "API errors and unexpected redirect report fixed messages without exposing response or key",
+        "stop and own timeout abort pending requests and clear tracked resources",
+        "stale results cannot be used; clearing the key disables AI and clears stored secret",
+        "transient AI 429/503 recover with two bounded retries; authentication never retries",
+        "image questions require explicit opt-in, retain option/image numbering, and cache separately by image",
+        "Ark-compatible request omits optional OpenAI store field; OpenAI retains store=false",
+        "fresh script instances after refresh or chapter navigation reload saved config and key without another save",
+        "saving settings with an empty key field retains the key across another fresh instance",
+        "old-version GM settings and key migrate automatically to one durable connection record",
+        "failed writes or readback never report durable-save success or enable an unsaved key",
+        "explicit clear survives refresh and cannot resurrect the legacy key",
+        "persisted keys remain origin-bound after reload and cannot follow a corrupted endpoint",
+        "original userscript name and namespace are retained for storage-preserving upgrades"
+      ]
+    },
+    {
+      "name": "flow",
+      "passed": true,
+      "checks": [
+        "two chapters: detect media, verify saved progress, quiz, switch card, switch chapter, finish",
+        "a missing directory uses the validated platform Next section button once and starts the following chapter",
+        "a filtered directory cannot skip chapters or falsely finish; navigation uses the platform Next section control",
+        "completion changing the current directory class does not lose its position",
+        "a Next section control belonging to another chapter is never clicked",
+        "a stalled native Next section action pauses after one click without guessing destination URLs",
+        "missing quiz answers pause without advancing",
+        "successful API response without persisted completion cannot advance or rerun indefinitely",
+        "stop cancels both modules and stale completion cannot navigate",
+        "per-tab persisted state resumes after refresh without repeating completed media",
+        "unsupported task pauses explicitly instead of skipping",
+        "disappearing task records are not mistaken for persisted completion",
+        "blocked navigation pauses after one click instead of looping",
+        "platform refusal stops without retries or next-task navigation",
+        "terminal unaccepted simulation falls back once to actual playback and verifies platform state",
+        "native mode uses actual playback for every new media task",
+        "protocol-only mode does not start actual playback after unaccepted simulation",
+        "actual player failure pauses without next-task navigation",
+        "browser autoplay policy keeps the coordinator waiting, then continues quizzes and the next chapter without another Start click",
+        "blank quiz wrapper reloads the platform entry then its generated work frame before submitting",
+        "platform task and chapter functions are called when page-defined navigation is available",
+        "stalled chapter content falls back once to same-course full navigation with enabled session preserved",
+        "immediate stop/resume waits for the old run to exit and then starts one new run",
+        "manual task change cannot cause an old completion to reload a different task",
+        "entering the course automatically runs native playback without start clicks; stop disables persistent autostart",
+        "transient native playback failure retries before moving to later tasks",
+        "media and quiz jobs on the same card are processed serially and verified together",
+        "visible platform verification waits and resumes automatically after the mask disappears",
+        "an unavailable Web Lock leaves the second tab idle; the lock holder alone executes tasks"
+      ]
+    },
+    {
+      "name": "integration",
+      "passed": true,
+      "checks": [
+        "full built userscript: enter -> auto native playback -> inline AI/feedback -> chapter AI/submit -> server verification -> next chapter -> finish, with no manual clicks",
+        "repeated completion does not resubmit; page exit releases every scheduled timer"
+      ]
+    },
+    {
+      "name": "integrationRecovery",
+      "passed": true,
+      "checks": [
+        "actual native reload path recovers a network media error using a new player document, without duplicate answers",
+        "full built userscript: enter -> auto native playback -> inline AI/feedback -> chapter AI/submit -> server verification -> next chapter -> finish, with no manual clicks",
+        "repeated completion does not resubmit; page exit releases every scheduled timer"
+      ]
+    },
+    {
+      "name": "integrationBackground",
+      "passed": true,
+      "checks": [
+        "complete two-chapter flow remains hidden and resumes each platform pause before continuing videos, inline AI and chapter quizzes",
+        "full built userscript: enter -> auto native playback -> inline AI/feedback -> chapter AI/submit -> server verification -> next chapter -> finish, with no manual clicks",
+        "repeated completion does not resubmit; page exit releases every scheduled timer"
+      ]
+    }
+  ],
+  "scope": "Offline DOM fixtures, simulated platform state, Canvas/FontFace drawing-command checks and mocked APIs. No browser accounts or live AI calls.",
+  "limitations": [
+    "Does not establish actual rendered image readability or model answer accuracy.",
+    "Does not establish live platform completion or compatibility across every course."
+  ]
+}

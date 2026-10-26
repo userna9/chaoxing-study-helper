@@ -1,0 +1,14 @@
+/node_modules/
+/reports/
+/coverage/
+.env
+.env.*
+!.env.example
+*.local.json
+secrets*.json
+*.log
+*.zip
+*.tgz
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,32 @@
+name: 问题反馈
+description: 报告识别、播放、字体、AI 或任务切换问题
+body:
+  - type: markdown
+    attributes:
+      value: 请不要粘贴 API 密钥、Cookie、带 enc 等令牌的课程链接或未遮盖账号信息的截图。
+  - type: input
+    id: version
+    attributes:
+      label: 脚本版本
+      placeholder: 例如 0.6.7
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 浏览器与油猴版本
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 操作步骤与预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 脱敏日志与实际表现
+      description: 区分顶部状态和“章节测验”中的详细日志；如涉及 AI，请说明是否开启图片选项，不要提供密钥。
+    validations:
+      required: true
