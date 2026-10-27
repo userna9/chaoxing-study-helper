@@ -1,6 +1,6 @@
 {
   "name": "chaoxing-study-helper",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "description": "学习通课程学习辅助 userscript：连续播放、章节测验与可配置 AI。",
   "private": true,
   "license": "MIT",

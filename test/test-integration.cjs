@@ -5,6 +5,7 @@ Object.defineProperty(document,'scripts',{get:()=>document.querySelectorAll('scr
 window.Element.prototype.getClientRects=function(){for(let p=this;p;p=p.parentElement)if(p.style?.display==='none')return [];return [{}]};
 let now=0,sequence=0,chapter=1,tab=0,cardDoc,cardWindow;
 const recovery=process.argv.includes('--recover-player');let injectedFailure=false;
+const startupRecovery=process.argv.includes('--startup-recovery');
 const backgroundMode=process.argv.includes('--background');if(backgroundMode){document.hidden=true;document.visibilityState='hidden';}
 const observed=new Set();
 class Observer{constructor(callback){this.callback=callback}observe(target){this.target=target;observed.add(this)}disconnect(){observed.delete(this)}}
@@ -29,16 +30,27 @@ function loadCard(){
   const player=parseHTML('<html><body><video></video><div class="tkTopic"><div class="tkTopic_title">判断题</div><div class="tkItem"><div class="tkItem_title">第'+chapter+'章视频内问答</div><ul><li class="ans-videoquiz-opt"><label><input type="radio">A、对</label></li><li class="ans-videoquiz-opt"><label><input type="radio">B、错</label></li></ul></div><button id="videoquiz-submit">提交</button><button id="videoquiz-continue" style="display:none">继续</button></div></body></html>');
   if(!pwin)pwin=virtualWindow(player.document,'https://mooc1.chaoxing.com/ananas/modules/video/index.html');else{Object.defineProperty(player.document,'scripts',{get:()=>player.document.querySelectorAll('script')});pwin.document=player.document;}
   pwin.frameElement=nested;
-  const video=player.document.querySelector('video');Object.assign(video,{duration:3,currentTime:0,paused:true,ended:false,muted:false,playbackRate:1});
-  let continued=false,playing=false,backgroundPaused=false;
+  const startupTask=startupRecovery&&!server.has(identity);
+  let video=player.document.querySelector('video'),sourceReady=!startupTask;
+  let continued=false,playing=false,backgroundPaused=false,replacementScheduled=false;
+  function configureVideo(video){Object.assign(video,{duration:sourceReady?3:NaN,readyState:sourceReady?3:0,currentTime:0,paused:true,ended:false,muted:false,playbackRate:1});
   video.pause=()=>{video.paused=true};video.play=()=>{
-   calls.push('play:'+identity);video.paused=false;
+   calls.push('play:'+identity);
+   if(!sourceReady){scheduleReplacement();calls.push('startup-denied:'+identity);return Promise.reject(Object.assign(new Error('source not ready'),{name:'NotAllowedError'}));}
+   video.paused=false;
    if(recovery&&!injectedFailure){injectedFailure=true;video.error={code:2};queueMicrotask(()=>video.dispatchEvent(new window.Event('error')));return Promise.resolve();}
    if(!continued){video.currentTime=1;video.dispatchEvent(new window.Event('timeupdate'));video.paused=true;return Promise.resolve();}
    if(!playing){playing=true;timeout(()=>{assert.equal(video.paused,false,'video must resume after background pause before it can end');video.currentTime=3;video.dispatchEvent(new window.Event('timeupdate'));video.ended=true;server.add(identity);nested.parentElement.classList.add('ans-job-finished');video.dispatchEvent(new window.Event('ended'));},1000);}
    if(backgroundMode&&!backgroundPaused){backgroundPaused=true;queueMicrotask(()=>{calls.push('background-pause:'+identity);video.paused=true;video.dispatchEvent(new window.Event('pause'))});}
    return Promise.resolve();
   };
+  }
+  configureVideo(video);
+  function scheduleReplacement(){if(!startupTask||replacementScheduled)return;replacementScheduled=true;timeout(()=>{
+   sourceReady=true;const replacement=player.document.createElement('video');configureVideo(replacement);video.replaceWith(replacement);video=replacement;calls.push('video-replaced:'+identity);
+   for(const observer of [...observed])if(observer.target===player.document.documentElement)observer.callback([{target:replacement}]);
+   replacement.dispatchEvent(new window.Event('loadedmetadata'));replacement.dispatchEvent(new window.Event('canplay'));
+  },600);}
   const inputs=[...player.document.querySelectorAll('input')];inputs.forEach(input=>input.addEventListener('click',()=>inputs.forEach(other=>other.checked=other===input)));
   player.document.getElementById('videoquiz-submit').addEventListener('click',()=>{calls.push('inline-submit:'+identity);assert(inputs[0].checked);player.document.getElementById('videoquiz-continue').style.display='block'});
   player.document.getElementById('videoquiz-continue').addEventListener('click',()=>{continued=true;player.document.querySelector('.tkTopic').style.display='none';calls.push('inline-continue:'+identity)});
@@ -86,6 +98,7 @@ vm.createContext(ctx);vm.runInContext(fs.readFileSync('dist/chaoxing-study-helpe
  assert(observed.size<=6,'detached frame observers are removed while navigating');
  window.dispatchEvent(new window.Event('pagehide'));assert.equal(scheduled.size,0);assert.equal(observed.size,0);
  if(recovery){assert.equal(calls.filter(x=>x.startsWith('reload-player:')).length,1);console.log('PASS actual native reload path recovers a network media error using a new player document, without duplicate answers');}
+ if(startupRecovery){assert.equal(calls.filter(x=>x.startsWith('video-replaced:')).length,2);assert(calls.filter(x=>x.startsWith('startup-denied:')).length>=2);assert.equal(calls.filter(x=>x.startsWith('reload-player:')).length,0);console.log('PASS both chapters recover asynchronous source rejection and video-node replacement, then complete inline questions and chapter submissions without manual clicks or frame reloads');}
   if(backgroundMode){assert.equal(calls.filter(x=>x.startsWith('background-pause:')).length,2);for(const ch of [1,2])assert(calls.filter(x=>x==='play:'+ch+':0').length>=3);console.log('PASS complete two-chapter flow remains hidden and resumes each platform pause before continuing videos, inline AI and chapter quizzes');}
  console.log('PASS full built userscript: enter -> auto native playback -> inline AI/feedback -> chapter AI/submit -> server verification -> next chapter -> finish, with no manual clicks');
  console.log('PASS repeated completion does not resubmit; page exit releases every scheduled timer');

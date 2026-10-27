@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         学习通进度协议实验助手
 // @namespace    local.cx.progress.experiment
-// @version      0.6.7
+// @version      0.6.8
 // @description  自动识别视频和章节测验、连续切换、实际播放与可配置 AI 兜底
 // @match        https://*.chaoxing.com/mycourse/studentstudy*
 // @match        https://*.chaoxing.com/mooc-ans/mycourse/studentstudy*
@@ -106,7 +106,7 @@
   root.innerHTML = `<style>
     section{font:13px/1.6 system-ui;background:#fff;color:#222;border:1px solid #ccc;border-radius:10px;padding:14px;width:300px;box-shadow:0 5px 24px #0002}
     b{font-size:15px} select,input,button{font:inherit;margin:5px 0;padding:5px;box-sizing:border-box}select{width:100%}input{width:65px}button{cursor:pointer;margin-right:6px}pre{white-space:pre-wrap;overflow:auto;max-height:160px;font:12px/1.5 system-ui}small{display:block;color:#666}
-  </style><section><b>学习助手 · 0.6.7</b>
+  </style><section><b>学习助手 · 0.6.8</b>
   <small>支持连续学习；完成状态以平台为准。</small>
   <details id="media-advanced"><summary>音视频诊断与实验功能</summary><select id="jobs"><option>等待自动识别</option></select>
   <label>模拟倍率 <input id="rate" type="number" min="1" max="16" value="1"></label>
@@ -354,7 +354,7 @@
   el('jobs').addEventListener('change',showTask);
   el('diagnose').addEventListener('click',() => {
     const task = tasks[Number(el('jobs').value)];
-    log(`版本 0.6.7；同源 XHR；任务数 ${tasks.length}；状态 ${active ? '运行' : inFlight ? '取消中' : '空闲'}\n` + (task ? `module=${task.item.property?.module}；type=${task.item.type}；headOffset=${Number(task.item.headOffset) || 0} 毫秒\nreportUrl=${task.defaults.reportUrl ? '存在' : '缺少'}；fid=${task.defaults.fid ? '存在' : '缺少'}；clazzId=${task.defaults.clazzId ? '存在' : '缺少'}；userid=${task.defaults.userid ? '存在' : '缺少'}；页面=${sameChapter(task) ? '有效' : '已变化'}` : '没有识别到 mArg 视频任务。'));
+    log(`版本 0.6.8；同源 XHR；任务数 ${tasks.length}；状态 ${active ? '运行' : inFlight ? '取消中' : '空闲'}\n` + (task ? `module=${task.item.property?.module}；type=${task.item.type}；headOffset=${Number(task.item.headOffset) || 0} 毫秒\nreportUrl=${task.defaults.reportUrl ? '存在' : '缺少'}；fid=${task.defaults.fid ? '存在' : '缺少'}；clazzId=${task.defaults.clazzId ? '存在' : '缺少'}；userid=${task.defaults.userid ? '存在' : '缺少'}；页面=${sameChapter(task) ? '有效' : '已变化'}` : '没有识别到 mArg 视频任务。'));
   });
   window.addEventListener('pagehide',() => stop());
   setTimeout(scan,1000);
@@ -417,8 +417,12 @@
     if(url.origin!==new URL(task.base).origin||!/^\/ananas\/modules\/(video|audio)\/index\.html$/.test(url.pathname))return {ok:false,message:'实际播放器入口不受支持'};
     const run=++generation;inFlight=true;controls();
     try{
-      const oldDoc=task.requestWin.document;
-      log(force?'重新加载平台播放器以恢复临时故障……':'播放器入口为空，重新加载平台播放器……');frame.src=url.href;
+      const oldDoc=task.requestWin.document,button=!force&&oldDoc.querySelector('.vjs-big-play-button');
+      let initializedButton=null;
+      if([page.document,task.doc,oldDoc].some(doc=>[...doc.querySelectorAll('#fcqrimg,.chapterVideoFaceMaskDiv,.yidun_popup,.geetest_panel')].some(node=>node.getClientRects().length>0)))return {ok:false,message:'等待平台验证后再初始化播放器',retryable:true};
+      if(button&&!button.disabled&&button.getAttribute?.('aria-disabled')!=='true'&&(typeof button.getClientRects!=='function'||button.getClientRects().length)){
+        initializedButton=button;log('视频节点尚未创建，通过平台播放入口初始化……');button.click();
+      }else{log(force?'重新加载平台播放器以恢复临时故障……':'播放器入口为空，重新加载平台播放器……');frame.src=url.href;}
       let deadline=Date.now()+20000,lastPoll=Date.now();
       for(;;){
         const now=Date.now(),gap=now-lastPoll;lastPoll=now;
@@ -426,7 +430,7 @@
         if(run!==generation)return {ok:false,message:'播放器加载已取消'};
         if(!sameChapter(task))return {ok:false,message:'播放器加载时任务已变化'};
         if((!force||task.requestWin.document!==oldDoc)&&task.requestWin.document.querySelector('video,audio')){
-          inFlight=false;return await playNative(index);
+          inFlight=false;return await playNative(index,initializedButton);
         }
         if(Date.now()>=deadline)break;
         await new Promise(resolve=>setTimeout(resolve,500));
@@ -435,133 +439,193 @@
     }catch{return {ok:false,message:'平台播放器重新加载失败'}}
     finally{inFlight=false;controls()}
   }
-  function playNative(index){
+  function playNative(index,initializedButton=null){
     if(active||inFlight||nativeState)return Promise.resolve({ok:false,message:'音视频正在运行'});
     const task=tasks[index];
     if(!task||!sameChapter(task))return Promise.resolve({ok:false,message:'实际播放器所在任务已变化'});
-    const media=task.requestWin.document.querySelector('video,audio');
+    let media=task.requestWin.document.querySelector('video,audio'),playerDoc=task.requestWin.document;
     if(!media)return loadAndPlayNative(task,index);
     if(typeof media.play!=='function')return Promise.resolve({ok:false,message:'未找到实际播放器'});
-    let resolveDone,watch,prepared=false,progressed=false,startPosition=0,lastLog=0,pausedAt=0,openedPlayer=false,inlinePending=false;
-    let playPending=false,autoplayRetries=0,autoplayTimer=null,waitingForGesture=false;
-    let resumeAttempts=0,lastResume=0,lastPosition=media.currentTime||0,lastProgress=Date.now(),blockedAt=0,lastWatch=Date.now(),background;
-    let deadline=Date.now()+30000;
-    const mutedBefore=media.muted,defaultMutedBefore=media.defaultMuted;
+    let resolveDone,watch,background,observer,bound=false,mutedBefore,defaultMutedBefore;
+    let prepared=false,progressed=false,startPosition=0,lastLog=0,pausedAt=0,inlinePending=false;
+    let playPending=null,wakeAfterPlay=false,mediaEpoch=0,retryIndex=0,retryTimer=null,waitingForGesture=false,startupComplete=false,readyKey='',missingAt=null;
+    let resumeAttempts=0,lastResume=0,lastPosition=media.currentTime||0,lastProgress=Date.now(),blockedAt=null,lastWatch=Date.now(),deadline=Date.now()+30000;
+    const openedButtons=new WeakSet(),retryDelays=[350,1000,2000,4000,8000];
+    if(initializedButton)openedButtons.add(initializedButton);
     const promise=new Promise(resolve=>{resolveDone=resolve});
+    const alive=()=>nativeState?.promise===promise;
     const notify=()=>{if(typeof root.dispatchEvent==='function'&&typeof window.Event==='function')root.dispatchEvent(new window.Event('cx-media-state'));};
-    const finish=(ok,message,retryable=false)=>{
-      if(!nativeState||nativeState.promise!==promise)return;
-      clearInterval(watch);clearTimeout(autoplayTimer);background?.stop();media.removeEventListener('loadedmetadata',prepare);media.removeEventListener('timeupdate',update);media.removeEventListener('ended',ended);media.removeEventListener('error',failed);media.removeEventListener('playing',playing);
-      task.requestWin.document.removeEventListener?.('click',userPlay,true);
-      nativeState=null;
-      try{media.pause();media.defaultMuted=defaultMutedBefore;media.muted=mutedBefore}catch{}
-      controls();log(message);resolveDone({ok,message,retryable});
-    };
+    const eventCurrent=event=>!event?.target||event.target===media;
+    const readiness=()=>({source:media.currentSrc||media.src||'',level:(Number.isFinite(media.duration)&&media.duration>0?1:0)+(Number(media.readyState)>=2?1:0)+(Number(media.readyState)>=3?1:0)});
+    function cancelRetry(){clearTimeout(retryTimer);retryTimer=null;}
     function silence(){media.defaultMuted=true;media.muted=true;}
-    function playing(){
-      if(nativeState?.promise!==promise||media.paused)return;
-      if(waitingForGesture){waitingForGesture=false;nativeState.waitingForGesture=false;pausedAt=0;lastProgress=Date.now();log('实际播放器已开始，自动接续当前任务。');notify();}
+    function setWaiting(value){if(waitingForGesture===value)return;waitingForGesture=value;nativeState.waitingForGesture=value;notify();}
+    function detachMedia(){
+      cancelRetry();observer?.disconnect();observer=null;background?.stop();background=null;
+      if(!bound)return;
+      for(const [name,handler]of [['loadedmetadata',ready],['loadeddata',ready],['canplay',ready],['timeupdate',update],['ended',ended],['error',failed],['playing',playing],['volumechange',volumeChanged]])media.removeEventListener(name,handler);
+      playerDoc.removeEventListener?.('click',userPlay,true);
+      try{media.pause();media.defaultMuted=defaultMutedBefore;media.muted=mutedBefore}catch{}
+      bound=false;
+    }
+    function finish(ok,message,retryable=false){
+      if(!alive())return;
+      mediaEpoch++;playPending=null;clearInterval(watch);detachMedia();nativeState=null;
+      controls();log(message);resolveDone({ok,message,retryable});
+    }
+    function synchronize(){
+      if(!alive())return false;
+      try{
+        const doc=task.requestWin.document,next=doc.querySelector('video,audio');
+        if(!next){
+          if(missingAt===null)missingAt=Date.now();
+          if(Date.now()-missingAt>=20000)finish(false,'平台替换播放器后未加载新视频，等待重试',true);
+          return false;
+        }
+        missingAt=null;
+        if(next!==media||doc!==playerDoc){
+          if(typeof next.play!=='function'){finish(false,'新播放器没有可用的播放接口');return false;}
+          log('平台更新了视频节点，自动绑定新播放器……');bindMedia(next,doc);return false;
+        }
+        return true;
+      }catch{finish(false,'播放器页面已变化或不可访问，已停止');return false;}
+    }
+    function playing(event){
+      if(!alive()||!eventCurrent(event)||!synchronize()||media.paused)return;
+      startupComplete=true;cancelRetry();retryIndex=0;pausedAt=0;lastProgress=Date.now();
+      if(waitingForGesture){setWaiting(false);log('实际播放器已开始，自动接续当前任务。');}
     }
     function userPlay(event){
-      if(waitingForGesture&&event.isTrusted===true&&event.target?.closest?.('.vjs-big-play-button,.vjs-play-control,video,audio'))tryPlay();
-    }
-    function playError(error){
-      if(nativeState?.promise!==promise)return;
-      playPending=false;
-      if(error?.name==='NotAllowedError'){
-        if(autoplayRetries++===0){
-          log('浏览器拒绝自动播放，重新设置静音后重试……');
-          autoplayTimer=setTimeout(()=>{autoplayTimer=null;tryPlay();},150);return;
-        }
-        waitingForGesture=true;nativeState.waitingForGesture=true;
-        log('浏览器仍要求点击播放；已保留当前任务，点击视频播放后自动接续。');notify();return;
+      if(waitingForGesture&&event.isTrusted===true&&event.target?.closest?.('.vjs-big-play-button,.vjs-play-control,video,audio')){
+        cancelRetry();retryIndex=0;setWaiting(false);tryPlay();
       }
-      finish(false,`实际播放启动失败（${error?.name||'播放错误'}），请检查播放器提示`,error?.name==='AbortError');
     }
-    const tryPlay=()=>{
-      if(nativeState?.promise!==promise||playPending||!sameChapter(task))return;
-      playPending=true;
+    function retry(error){
+      if(!alive())return;
+      if(retryIndex<retryDelays.length){
+        const ms=retryDelays[retryIndex++];
+        log(`播放器尚未就绪（${error?.name||'初始化'}），${ms/1000} 秒后静音重试 ${retryIndex}/${retryDelays.length}……`);
+        retryTimer=setTimeout(()=>{retryTimer=null;tryPlay();},ms);return;
+      }
+      if(error?.name==='NotAllowedError'){
+        setWaiting(true);log('多次静音启动仍被浏览器拒绝；保留当前任务，播放器就绪或点击播放后自动接续。');
+      }else finish(false,`实际播放器初始化失败（${error?.name||'播放错误'}），等待重试`,true);
+    }
+    function playError(error,attempt){
+      if(!alive()||attempt.epoch!==mediaEpoch||attempt.media!==media||playPending!==attempt)return;
+      playPending=null;wakeAfterPlay=false;if(!synchronize())return;
+      if(error?.name==='NotAllowedError'||error?.name==='AbortError'){retry(error);return;}
+      finish(false,`实际播放启动失败（${error?.name||'播放错误'}），请检查播放器提示`);
+    }
+    function tryPlay(reason='normal'){
+      if(!alive()||!sameChapter(task)||!synchronize())return;
+      if(playPending){if(reason==='background')wakeAfterPlay=true;return;}
+      if(retryTimer!==null||waitingForGesture||inlinePending||blocked())return;
+      const attempt={epoch:mediaEpoch,media};playPending=attempt;
       try{
-        // 平台播放器在首次点击时才装入媒体源；直接对空 video 调用 play 会失败。
-        const button=task.requestWin.document.querySelector('.vjs-big-play-button');
+        const button=playerDoc.querySelector('.vjs-big-play-button');silence();
+        const visible=button&&(typeof button.getClientRects!=='function'||button.getClientRects().length>0);
+        if(!startupComplete&&visible&&!openedButtons.has(button)){
+          if(button.disabled||button.getAttribute?.('aria-disabled')==='true'){playPending=null;retry({name:'AbortError'});return;}
+          openedButtons.add(button);log('通过平台播放按钮初始化媒体源……');button.click();
+        }
+        // Initialization may replace the <video> or reset its sound preferences.
+        if(!alive()||attempt.epoch!==mediaEpoch||!synchronize()){if(playPending===attempt)playPending=null;return;}
         silence();
-        if(!prepared&&!openedPlayer&&button){openedPlayer=true;log('通过平台播放按钮初始化媒体源……');button.click();}
-        // Platform initialization may reset mute; apply it after its click handler too.
-        silence();
-        Promise.resolve(media.play()).then(()=>{if(nativeState?.promise===promise){playPending=false;playing();}},playError);
-      }catch(error){playError(error)}
-    };
+        Promise.resolve(media.play()).then(()=>{
+          if(alive()&&attempt.epoch===mediaEpoch&&playPending===attempt){
+            playPending=null;playing();
+            if(wakeAfterPlay){wakeAfterPlay=false;if(media.paused&&!media.ended)tryPlay('background');}
+          }
+        },error=>playError(error,attempt));
+      }catch(error){playError(error,attempt)}
+    }
     function blocked(){
       return [page.document,task.doc,task.requestWin.document].some(doc=>[...doc.querySelectorAll('#fcqrimg,.chapterVideoFaceMaskDiv,.yidun_popup,.geetest_panel')].some(node=>node.getClientRects().length>0));
     }
     function prepare(){
       if(prepared||!Number.isFinite(media.duration)||media.duration<=0)return;
       prepared=true;
-      try{
-        // 位置已到末尾但任务未通过时，重新实际播放；否则沿用播放器可恢复的位置。
-        if(media.currentTime>=media.duration-1)media.currentTime=0;
-        startPosition=media.currentTime||0;
-        deadline=Date.now()+(media.duration-startPosition)*1000+180000;
-        log(`实际播放：${task.title}；使用平台播放器速度 ${media.playbackRate||1} 倍。`);
-        tryPlay();
-      }catch{finish(false,'实际播放器暂时不能恢复位置，请在平台中重新播放')}
+      if(media.currentTime>=media.duration-1)media.currentTime=0;
+      startPosition=media.currentTime||0;deadline=Date.now()+(media.duration-startPosition)*1000+180000;
+      log(`实际播放：${task.title}；使用平台播放器速度 ${media.playbackRate||1} 倍。`);
     }
-    function update(){
-      if(!prepared)return;
+    function ready(event){
+      if(!alive()||!eventCurrent(event)||!synchronize())return;
+      try{
+        const key=readiness();
+        if(!startupComplete&&(key.source!==readyKey.source||key.level>readyKey.level)){readyKey=key;cancelRetry();retryIndex=0;setWaiting(false);}
+        prepare();if(!startupComplete)tryPlay();
+      }catch{finish(false,'实际播放器暂时不能恢复位置，请在平台中重新播放');}
+    }
+    function volumeChanged(event){
+      if(alive()&&eventCurrent(event)&&!startupComplete&&media.paused&&!media.muted)try{silence()}catch{}
+    }
+    function update(event){
+      if(!alive()||!eventCurrent(event)||!synchronize()||!prepared)return;
       if(media.currentTime>startPosition+0.1)progressed=true;
       if(Date.now()-lastLog>10000){lastLog=Date.now();log(`实际播放 ${Math.floor(media.currentTime)}/${Math.floor(media.duration)} 秒`);}
     }
-    function ended(){if(prepared&&progressed)finish(true,'实际视频已播放结束，等待核对平台完成状态。')}
-    function failed(){finish(false,'实际播放器发生加载错误，请检查平台提示',media.error?.code!==4)}
+    function ended(event){if(eventCurrent(event)&&synchronize()&&prepared&&progressed)finish(true,'实际视频已播放结束，等待核对平台完成状态。');}
+    function failed(event){if(eventCurrent(event)&&synchronize())finish(false,'实际播放器发生加载错误，请检查平台提示',media.error?.code!==4);}
+    function bindMedia(next,doc){
+      if(inlinePending)host.__cxRuntime?.quiz?.stop();
+      mediaEpoch++;playPending=null;wakeAfterPlay=false;detachMedia();media=next;playerDoc=doc;bound=true;
+      mutedBefore=media.muted;defaultMutedBefore=media.defaultMuted;
+      prepared=false;progressed=false;startupComplete=false;inlinePending=false;retryIndex=0;setWaiting(false);
+      lastPosition=media.currentTime||0;lastProgress=Date.now();pausedAt=0;resumeAttempts=0;readyKey=readiness();deadline=Date.now()+30000;
+      for(const [name,handler]of [['loadedmetadata',ready],['loadeddata',ready],['canplay',ready],['timeupdate',update],['ended',ended],['error',failed],['playing',playing],['volumechange',volumeChanged]])media.addEventListener(name,handler);
+      playerDoc.addEventListener?.('click',userPlay,true);
+      background=createBackgroundPlayback({windows:[page,task.win,task.requestWin],media,
+        isCurrent:()=>alive()&&sameChapter(task)&&task.requestWin.document===playerDoc&&playerDoc.querySelector('video,audio')===media,enabled:()=>backgroundEnabled,
+        isBlocked:()=>{try{const box=playerDoc.querySelector('.tkTopic');return waitingForGesture||inlinePending||blocked()||Boolean(box&&box.getClientRects().length)}catch{return true}},play:()=>tryPlay('background'),
+        onWake:()=>{const now=Date.now(),gap=now-lastWatch;if(backgroundEnabled&&gap>15000){deadline+=gap;lastProgress+=gap;if(pausedAt)pausedAt+=gap;}lastWatch=now;}});
+      if(typeof MutationObserver==='function'&&playerDoc.documentElement){
+        observer=new MutationObserver(()=>{if(alive()&&synchronize()&&!startupComplete)ready();});
+        observer.observe(playerDoc.documentElement,{childList:true,subtree:true,attributes:true,attributeFilter:['src']});
+      }
+      try{silence();prepare();tryPlay()}catch{finish(false,'实际播放器暂时不能初始化');}
+    }
     nativeState={promise,finish,waitingForGesture:false,title:task.title};current=task;controls();
-    background=createBackgroundPlayback({windows:[page,task.win,task.requestWin],media,
-      isCurrent:()=>nativeState?.promise===promise&&sameChapter(task),enabled:()=>backgroundEnabled,
-      isBlocked:()=>{try{const box=task.requestWin.document.querySelector('.tkTopic');return waitingForGesture||inlinePending||blocked()||Boolean(box&&box.getClientRects().length)}catch{return true}},play:tryPlay,
-      onWake:()=>{const now=Date.now(),gap=now-lastWatch;if(backgroundEnabled&&gap>15000){deadline+=gap;lastProgress+=gap;if(pausedAt)pausedAt+=gap;}lastWatch=now;}});
-    media.addEventListener('loadedmetadata',prepare);media.addEventListener('timeupdate',update);media.addEventListener('ended',ended);media.addEventListener('error',failed);media.addEventListener('playing',playing);
-    task.requestWin.document.addEventListener?.('click',userPlay,true);
     watch=setInterval(()=>{
       try{
-      if(!sameChapter(task)){finish(false,'实际播放时章节已切换');return;}
-      const now=Date.now(),gap=now-lastWatch;lastWatch=now;
-      // A throttled/frozen hidden tab did not spend that interval actively waiting.
-      // Only adjust local watchdog budgets; media time remains the player's value.
-      if(backgroundEnabled&&background.hidden()&&gap>15000){deadline+=gap;lastProgress+=gap;if(pausedAt)pausedAt+=gap;}
-      if(blocked()){if(!blockedAt){blockedAt=Date.now();log('等待平台验证，验证完成后自动恢复。');}return;}
-      if(blockedAt){deadline+=Date.now()-blockedAt;lastProgress=Date.now();blockedAt=0;pausedAt=0;resumeAttempts=0;tryPlay();}
-      if(task.requestWin.frameElement?.parentElement?.classList.contains('ans-job-finished')){finish(true,'平台播放器已标记任务完成。');return;}
-      if(waitingForGesture){
-        deadline+=gap;lastProgress=now;pausedAt=0;
-        if(media.paused)return;
-        playing();
-      }
-      if(!inlinePending&&Date.now()>deadline){finish(false,'实际播放等待超时，请检查播放器状态');return;}
-      if(inlinePending)return;
-      const quizBox=task.requestWin.document.querySelector('.tkTopic');
-      if(quizBox&&quizBox.getClientRects().length>0){
-        const handler=host.__cxRuntime?.quiz?.inline;
-        if(!handler){finish(false,'检测到视频内问答，当前测验模块尚未就绪');return;}
-        inlinePending=true;pausedAt=0;const started=Date.now();
-        log('检测到视频内问答，正在匹配并等待平台反馈……');
-        Promise.resolve(handler(task.requestWin,{courseId:new URL(task.base).searchParams.get('courseid')||new URL(location.href).searchParams.get('courseId')||'',isCurrent:()=>nativeState?.promise===promise&&sameChapter(task)})).then(result=>{
-          if(nativeState?.promise!==promise)return;
-          if(!result?.ok){finish(false,result?.message||'视频内问答未完成');return;}
-          deadline+=Date.now()-started;tryPlay();
-        }).catch(()=>finish(false,'视频内问答处理失败')).finally(()=>{inlinePending=false;if(nativeState?.promise===promise)background?.resume();});
-        return;
-      }
-      if(media.paused&&!media.ended){
-        if(!pausedAt)pausedAt=Date.now();
-        if((backgroundEnabled||!background.hidden())&&Date.now()-pausedAt>=3000&&Date.now()-lastResume>=5000&&resumeAttempts<3){resumeAttempts++;lastResume=Date.now();tryPlay();}
-        if(Date.now()-pausedAt>20000)finish(false,'实际播放器已暂停，请在平台继续播放后重新开启连续学习');
-      }else{pausedAt=0;resumeAttempts=0;}
-      if(media.currentTime>lastPosition+0.1){lastPosition=media.currentTime;lastProgress=Date.now();}
-      else if(prepared&&!media.paused&&!media.ended&&Date.now()-lastProgress>60000)finish(false,'实际播放器缓冲停滞，等待重试',true);
+        if(!sameChapter(task)){finish(false,'实际播放时章节已切换');return;}
+        if(task.requestWin.frameElement?.parentElement?.classList.contains('ans-job-finished')){finish(true,'平台播放器已标记任务完成。');return;}
+        if(!synchronize())return;
+        if(!startupComplete){const key=readiness();if(key.source!==readyKey.source||key.level>readyKey.level)ready();if(!alive())return;}
+        const now=Date.now(),gap=now-lastWatch;lastWatch=now;
+        if(backgroundEnabled&&background.hidden()&&gap>15000){deadline+=gap;lastProgress+=gap;if(pausedAt)pausedAt+=gap;}
+        if(blocked()){if(blockedAt===null){blockedAt=Date.now();log('等待平台验证，验证完成后自动恢复。');}return;}
+        if(blockedAt!==null){deadline+=Date.now()-blockedAt;lastProgress=Date.now();blockedAt=null;pausedAt=0;resumeAttempts=0;tryPlay();}
+        if(waitingForGesture){deadline+=gap;lastProgress=now;pausedAt=0;if(media.paused)return;playing();}
+        if(!inlinePending&&Date.now()>deadline){finish(false,'实际播放等待超时，请检查播放器状态',!startupComplete);return;}
+        if(inlinePending)return;
+        const quizBox=playerDoc.querySelector('.tkTopic');
+        if(quizBox&&quizBox.getClientRects().length>0){
+          const handler=host.__cxRuntime?.quiz?.inline;
+          if(!handler){finish(false,'检测到视频内问答，当前测验模块尚未就绪');return;}
+          inlinePending=true;pausedAt=0;const started=Date.now(),questionEpoch=mediaEpoch;
+          log('检测到视频内问答，正在匹配并等待平台反馈……');
+          Promise.resolve(handler(task.requestWin,{courseId:new URL(task.base).searchParams.get('courseid')||new URL(location.href).searchParams.get('courseId')||'',isCurrent:()=>alive()&&mediaEpoch===questionEpoch&&sameChapter(task)})).then(result=>{
+            if(!alive()||mediaEpoch!==questionEpoch)return;
+            if(!result?.ok){finish(false,result?.message||'视频内问答未完成');return;}
+            deadline+=Date.now()-started;
+          }).catch(()=>{if(alive()&&mediaEpoch===questionEpoch)finish(false,'视频内问答处理失败')}).finally(()=>{
+            if(alive()&&mediaEpoch===questionEpoch){inlinePending=false;tryPlay();background?.resume();}
+          });return;
+        }
+        if(media.paused&&!media.ended){
+          if(!pausedAt)pausedAt=Date.now();
+          if((backgroundEnabled||!background.hidden())&&Date.now()-pausedAt>=3000&&Date.now()-lastResume>=5000&&resumeAttempts<3){resumeAttempts++;lastResume=Date.now();tryPlay();}
+          if(Date.now()-pausedAt>20000&&!playPending&&retryTimer===null)finish(false,'实际播放器已暂停，等待重新加载',true);
+        }else{pausedAt=0;resumeAttempts=0;}
+        if(media.currentTime>lastPosition+0.1){lastPosition=media.currentTime;lastProgress=Date.now();}
+        else if(prepared&&!media.paused&&!media.ended&&Date.now()-lastProgress>60000)finish(false,'实际播放器缓冲停滞，等待重试',true);
       }catch{finish(false,'播放器页面已变化或不可访问，已停止');}
     },1000);
-    silence();prepare();if(!prepared)tryPlay();
-    return promise;
+    bindMedia(media,playerDoc);return promise;
   }
+
   if(typeof GM_getValue==='function')el('rate').value=String(GM_getValue('cx-media-rate',1));
   el('rate').addEventListener('change',()=>{
     const value=Number(el('rate').value);
@@ -804,7 +868,7 @@
       let handle,settled=false,watchdog;
       const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(watchdog);requests.delete(handle);fn(value)};
       handle=GM_xmlhttpRequest({method:'POST',url:'https://lyck6.cn/scriptService/api/autoFreeAnswer',anonymous:true,redirect:'error',
-        headers:{'Content-Type':'application/json;charset=utf-8',Version:'0.6.7'},
+        headers:{'Content-Type':'application/json;charset=utf-8',Version:'0.6.8'},
         data:JSON.stringify({question:q.text,options:q.options.map(o=>o.text),type:({single:0,multiple:1,completion:2,judgement:3})[q.type]}),timeout:15000,
         onload:r=>{try{
           if(r.finalUrl&&new URL(r.finalUrl).href!=='https://lyck6.cn/scriptService/api/autoFreeAnswer')throw new Error('题库发生重定向');
@@ -1683,7 +1747,7 @@ THE SOFTWARE.
   if(!bridge?.media||!bridge.quiz||!root)return;
   const section=root.querySelector('section'),panel=document.createElement('div');
   panel.id='cx-flow';panel.style.cssText='padding:8px 0;border-bottom:1px solid #ddd;margin-bottom:8px';
-  panel.innerHTML='<b>自动连续学习 · 0.6.7</b><small id="flow-status">等待课程加载……</small><label><input id="flow-auto" type="checkbox" style="width:auto">进入本课程自动运行</label><label style="display:block"><input id="flow-background" type="checkbox" style="width:auto">允许切换网页后继续播放</label><div><button id="flow-start">开启连续学习</button><button id="flow-stop">停止全部</button><button id="flow-collapse">收起面板</button></div><small>自动识别视频、视频内问答和章节测验，确认平台完成后切换。后台播放需将课程网站加入浏览器“始终保持活动”列表。</small><details id="flow-advanced"><summary>高级音视频设置</summary><label>音视频方式<select id="flow-media-mode"><option value="native">实际播放（推荐）</option><option value="hybrid">先尝试上报，未通过则实际播放</option><option value="protocol">仅尝试模拟上报（实验）</option></select></label></details>';
+  panel.innerHTML='<b>自动连续学习 · 0.6.8</b><small id="flow-status">等待课程加载……</small><label><input id="flow-auto" type="checkbox" style="width:auto">进入本课程自动运行</label><label style="display:block"><input id="flow-background" type="checkbox" style="width:auto">允许切换网页后继续播放</label><div><button id="flow-start">开启连续学习</button><button id="flow-stop">停止全部</button><button id="flow-collapse">收起面板</button></div><small>自动识别视频、视频内问答和章节测验，确认平台完成后切换。后台播放需将课程网站加入浏览器“始终保持活动”列表。</small><details id="flow-advanced"><summary>高级音视频设置</summary><label>音视频方式<select id="flow-media-mode"><option value="native">实际播放（推荐）</option><option value="hybrid">先尝试上报，未通过则实际播放</option><option value="protocol">仅尝试模拟上报（实验）</option></select></label></details>';
   section.prepend(panel);
   const el=id=>root.getElementById(id);
   el('flow-background').checked=bridge.media.background?.enabled()!==false;

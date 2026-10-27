@@ -19,7 +19,7 @@
 ```sh
 git init -b main
 git add .
-git commit -m "Initial release: v0.6.7"
+git commit -m "Initial release: v0.6.8"
 git remote add origin "https://github.com/YOUR_USERNAME/chaoxing-study-helper.git"
 git push -u origin main
 ```
@@ -28,6 +28,6 @@ git push -u origin main
 
 ## 上传后安装
 
-在仓库中打开 `dist/chaoxing-study-helper.user.js` 并选择 Raw；油猴可以安装或复制其中完整代码。也可以新建 `v0.6.7` Release 并将该文件作为附件。
+在仓库中打开 `dist/chaoxing-study-helper.user.js` 并选择 Raw；油猴可以安装或复制其中完整代码。也可以新建 `v0.6.8` Release 并将该文件作为附件。
 
 仓库地址确定后，再决定是否为脚本配置 `@updateURL` 和 `@downloadURL`；不要保留他人的仓库地址。

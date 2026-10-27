@@ -1,10 +1,10 @@
 {
-  "version": "0.6.7",
+  "version": "0.6.8",
   "allPassed": true,
-  "scenarioCount": 151,
+  "scenarioCount": 167,
   "artifact": {
-    "bytes": 138746,
-    "sha256": "b26676b41bb56f8611fd629fd543f6b5a45f43ab488fedb2948544c924356a76"
+    "bytes": 143859,
+    "sha256": "fbe738be34c51f83c1028835e20a8ac73729c55dd4eb0a53ff9805adf557762d"
   },
   "suites": [
     {
@@ -85,6 +85,25 @@
         "late inline completion cannot restart a stopped native player",
         "a large hidden-tab timer gap extends watchdog budgets without changing actual playback time",
         "returning from a suspended hidden tab rebases watchdogs before the visible-tab check"
+      ]
+    },
+    {
+      "name": "playbackStartup",
+      "passed": true,
+      "checks": [
+        "a visible platform start button is initialized even when metadata is already available",
+        "a platform button that creates the first video is clicked once without a forced frame reload",
+        "delayed metadata cancels a pending retry and starts the ready video without a user click",
+        "platform initialization replacing the video binds and plays only the new node",
+        "a late rejection from a detached video cannot pause or retry its replacement; observers are cleaned up",
+        "a temporary gap between removed and inserted media nodes is handled without reloading the chapter",
+        "a genuinely new source/readiness state resumes an earlier policy wait automatically",
+        "a play request interrupted by asynchronous source initialization retries the existing player",
+        "metadata and canplay events do not create parallel play calls for the same node",
+        "a background resume arriving before play resolves is retained and executed after that request settles",
+        "an asynchronous mute reset during startup is corrected before the next play attempt",
+        "startup waits for platform verification to clear before making a playback request",
+        "an indefinitely missing replacement node exits with a retryable result and removes old listeners"
       ]
     },
     {
@@ -216,6 +235,15 @@
       "passed": true,
       "checks": [
         "actual native reload path recovers a network media error using a new player document, without duplicate answers",
+        "full built userscript: enter -> auto native playback -> inline AI/feedback -> chapter AI/submit -> server verification -> next chapter -> finish, with no manual clicks",
+        "repeated completion does not resubmit; page exit releases every scheduled timer"
+      ]
+    },
+    {
+      "name": "integrationStartup",
+      "passed": true,
+      "checks": [
+        "both chapters recover asynchronous source rejection and video-node replacement, then complete inline questions and chapter submissions without manual clicks or frame reloads",
         "full built userscript: enter -> auto native playback -> inline AI/feedback -> chapter AI/submit -> server verification -> next chapter -> finish, with no manual clicks",
         "repeated completion does not resubmit; page exit releases every scheduled timer"
       ]
